@@ -1,0 +1,62 @@
+name: Warido
+author: Warido
+version: 1.0
+main: com.warido.plugin.Main
+commands:
+    warido:
+        description: Main command for warido plugin
+    colors:
+        description: Logs all colors
+    removeblock:
+        description: Removes your blocks after 1.75 seconds
+        aliases: [rb]
+    soundtest:
+        description: Plays sound with voolume and pitch arguments
+    special:
+        description: Gives you a special item
+        aliases: [spc]
+    spawn:
+        description: Teleports you to the spawn
+    gmc:
+        description: Gamemode creative
+    gms:
+        description: Gamemode survival
+    gmsp:
+        description: Gamemode spectator
+    gma:
+        description: Gamemode adventure
+    fly:
+        description: Toggles fly
+    broadcast:
+        description: Broadcasts a message to everyone on the server
+        aliases: [bc]
+    feed:
+        description: Refills hunger
+    heal:
+        description: Heals 
+    look:
+        description: Changes the direction you're looking in
+    ip:
+        description: Shows you your ip-adress lol
+    ping:
+        description: Shows you your ping
+    killall:
+        description: Eliminates all of the given type of entity
+        aliases: [eraseall]
+    safewalk:
+        description: Bridge Hacks
+        aliases: [sw]
+    world: 
+        description: World manager
+        aliases: [w]
+    practice:
+        description: Practice inventory aim
+        aliases: [pr]
+    config:
+        description: Check config from in-game
+        aliases: [cnf]
+    names:
+        description: View your names
+    hat:
+        description: Gives hat.
+    
