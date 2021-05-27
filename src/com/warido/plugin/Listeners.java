@@ -2,11 +2,13 @@ package com.warido.plugin;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
 import org.bukkit.Effect;
@@ -41,15 +43,17 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.util.Vector;
 
-import com.warido.plugin.NametagEdit.NameTagColor;
+import com.warido.plugin.Liberaries.CustomItem;
+
+//import com.warido.plugin.NametagEdit.NameTagColor;
 
 public class Listeners implements Listener {
 	public static Plugin plugin;
@@ -151,7 +155,7 @@ public class Listeners implements Listener {
 				Block b = event.getBlock();
 				event.setCancelled(true);
 				BukkitScheduler scheduler = plugin.getServer().getScheduler();
-				scheduler.scheduleSyncDelayedTask((Plugin) this, new Runnable() {
+				scheduler.scheduleSyncDelayedTask(plugin, new Runnable() {
 
 					@Override
 					public void run() {
@@ -271,19 +275,27 @@ public class Listeners implements Listener {
 		event.setCancelled(true);
 	}
 	
+	@SuppressWarnings("deprecation")
 	@EventHandler
 	public void onGameTick(GameTickEvent event) {
 		Server s = event.getServer();
 		Collection<? extends Player> players = s.getOnlinePlayers();
 		for (Player player : players) {
 			CraftPlayer p = (CraftPlayer) player.getPlayer();
-			player.getScoreboard().getObjective(DisplaySlot.SIDEBAR).getScore("Ping").setScore(p.getHandle().ping);
 			int bps = 0;
 			if (Main.blocksRecently.get(p.getUniqueId().toString()) != null) {
 				bps = Main.blocksRecently.get(p.getUniqueId().toString());
 			}
-			player.getScoreboard().getObjective(DisplaySlot.SIDEBAR).getScore("BPS").setScore(bps);
-			player.getScoreboard().getObjective(DisplaySlot.SIDEBAR).getScore("Entities").setScore(p.getWorld().getEntities().size());
+			Date d = new Date();
+			String date = d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds();
+			String[] lines = {
+					p.getDisplayName(),
+					"&2Ping: &a" + p.getHandle().ping + "ms",
+					"&2BPS: &a" + bps + "bps",
+					"&2Entities: &a" + p.getWorld().getEntities().size(),
+					"&7" + date
+			};
+			Main.updateScoreboard(p, Main.tag, lines);
 		}
 	}
 	
@@ -316,12 +328,26 @@ public class Listeners implements Listener {
 			if (i.isSimilar(empty) | i.isSimilar(next1)) {
 				p.damage(0.001);
 			} else if (i.isSimilar(note)) {
+				String[] notes = Main.songsList.getSong(Main.songSelected.get(uuid)).getSongString().split("\s");
 				int progress = Main.songProgress.get(uuid);
-				String[] notes = Main.songsList.getSong(Main.songSelected.get(uuid)).split("\s");
 				String n = notes[progress % notes.length];
-				Main.songProgress.put(uuid, progress + 1);
-				float pitch = Main.songsList.noteToPitch(n);
-				p.playSound(p.getLocation(), Sound.NOTE_PIANO, 1.0f, pitch);
+				String[] blocks = n.split(",");
+				for(String b : blocks) {
+					float pitch = Main.songsList.noteToPitch(b);
+					Sound sound = Main.songsList.noteToSound(b);
+					p.playSound(p.getLocation(), sound, 10.0f, pitch);
+				}
+				if(progress % notes.length == notes.length-1) {
+					EntityType fw = EntityType.FIREWORK;
+					p.getWorld().spawnEntity(p.getLocation(), fw);
+				}
+				progress += 1;
+				n = notes[progress % notes.length];
+				while(n.equalsIgnoreCase("x") | n.indexOf("d") != -1) {
+					progress += 1;
+					n = notes[progress % notes.length];
+				}
+				Main.songProgress.put(uuid, progress);
 				int next = 0;
 				int counter = 0;
 				for (ItemStack item : inv.getContents()) {
@@ -378,8 +404,9 @@ public class Listeners implements Listener {
 
 //		event.setFormat(cc(format) + message);
 //		} else {
-		event.setFormat(ChatColor.DARK_AQUA + "[" + ChatColor.AQUA + "cutie❤" + ChatColor.DARK_AQUA + "] "
-				+ ChatColor.GREEN + p.getDisplayName() + ChatColor.WHITE + ": " + message);
+			event.setFormat(ChatColor.RED + "❤" +" "
+					+ ChatColor.GREEN + p.getDisplayName() + ChatColor.WHITE
+					+ ": " + message);
 //		}
 	}
 	
@@ -478,18 +505,20 @@ public class Listeners implements Listener {
 	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent e) {
 		Player p = e.getPlayer();
-		p.setPlayerListName(Main.cc("&6[MVP&0++&6] " + p.getName()));
-		p.setCustomName(Main.cc("&6[MVP&0++&6] " + p.getName()));
-		p.setDisplayName(Main.cc("&6[MVP&0++&6] " + p.getName()));
-//		EntityPlayer ep = ((CraftPlayer) p).getHandle();
-//		ep.displayName
-//		NametagEdit edit = new NametagEdit("player",p.getName(),NameTagColor.AQUA);
-//		edit.addPlayer(p);
-//		edit.sendToPlayer(p);
-//		edit.updateAll();
-		Main.newScoreboard(p);
+		char[] color = {'0','c','6','e','a','b'};
+		int playerAmount = Bukkit.getServer().getOnlinePlayers().size();
+		p.setDisplayName(Main.cc("&6[MVP&" + color[playerAmount & color.length] + "++&6] " + p.getName()));
 		e.setJoinMessage(ChatColor.RED + "❥ " + ChatColor.BOLD + p.getDisplayName() + ChatColor.RESET + ChatColor.RED
 				+ " joined");
+		Main.jinglesList.getSong(0).playSongToAll(plugin);
+	}
+	
+	@EventHandler
+	public void onPlayerLeave(PlayerQuitEvent e) {
+		Player p = e.getPlayer();
+		e.setQuitMessage(ChatColor.RED + "❥ " + ChatColor.BOLD + p.getDisplayName() + ChatColor.RESET + ChatColor.RED
+				+ " left");
+		Main.jinglesList.getSong(1).playSongToAll(plugin);
 	}
 
 	@EventHandler

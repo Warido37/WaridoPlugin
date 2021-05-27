@@ -2,6 +2,7 @@ package com.warido.plugin;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Time;
@@ -83,25 +84,37 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.warido.plugin.TableGenerator.Alignment;
-import com.warido.plugin.TableGenerator.Receiver;
+import com.warido.plugin.JSONMessage.HoverAction;
+import com.warido.plugin.Liberaries.ConsoleColor;
+import com.warido.plugin.Liberaries.CustomItem;
+import com.warido.plugin.Liberaries.ParticleEffect;
+import com.warido.plugin.Liberaries.TableGenerator;
+import com.warido.plugin.Liberaries.ParticleEffect.NoteColor;
+import com.warido.plugin.Liberaries.ParticleEffect.ParticleColor;
+import com.warido.plugin.Liberaries.TableGenerator.Alignment;
+import com.warido.plugin.Liberaries.TableGenerator.Receiver;
 
 import net.minecraft.server.v1_8_R3.EntityPlayer;
 import net.minecraft.server.v1_8_R3.IChatBaseComponent;
+import net.minecraft.server.v1_8_R3.IChatBaseComponent.ChatSerializer;
 import net.minecraft.server.v1_8_R3.MobSpawnerAbstract.a;
 import net.minecraft.server.v1_8_R3.NBTTagCompound;
 import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
 import net.minecraft.server.v1_8_R3.PacketPlayOutNamedEntitySpawn;
+import net.minecraft.server.v1_8_R3.PacketPlayOutWorldParticles;
 import net.minecraft.server.v1_8_R3.Packet;
+import net.minecraft.server.v1_8_R3.PacketDataSerializer;
 
 @SuppressWarnings("unused")
 public class Main extends JavaPlugin implements Listener {
 	FileConfiguration config = this.getConfig();
-	private static String tag = ChatColor.DARK_GREEN + "[" + ChatColor.GREEN + "WARIDO" + ChatColor.DARK_GREEN + "] "
+	public Plugin plugin;
+	static String tag = ChatColor.DARK_GREEN + "[" + ChatColor.GREEN + "WARIDO" + ChatColor.DARK_GREEN + "] "
 			+ ChatColor.WHITE;
 	private String ctag = ConsoleColor.GREEN + "[" + ConsoleColor.GREEN_BRIGHT + "WARIDO" + ConsoleColor.GREEN + "] "
 			+ ConsoleColor.WHITE;
@@ -121,6 +134,7 @@ public class Main extends JavaPlugin implements Listener {
 	public static HashMap<String, Integer> songSelected = new HashMap<String, Integer>();
 	public static HashMap<String, Integer> songProgress = new HashMap<String, Integer>();
 	public static Songs songsList = new Songs();
+	public static Songs jinglesList = new Jingle();
 	public static Special[] specials = new Special[0];
 
 	public static int commandsRan = 0;
@@ -128,8 +142,8 @@ public class Main extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
-		getServer().getPluginManager().registerEvents(new Listeners(Bukkit.getPluginManager().getPlugin("Warido")), this);
-		log(" ");
+		getServer().getPluginManager().registerEvents(new Listeners(Bukkit.getPluginManager().getPlugin("Warido")),
+				this);
 //		config.addDefault("youAreAwesome", true);
 //		Object specialsList = config.get("specials");
 //		if(specialsList != null) {
@@ -145,6 +159,9 @@ public class Main extends JavaPlugin implements Listener {
 		config.options().copyDefaults(true);
 		saveConfig();
 
+		songsList.loadSongs(this);
+		jinglesList.loadSongs(this);
+
 		this.getCommand("killall").setTabCompleter(new TabCompleterClass());
 		this.getCommand("removeblock").setTabCompleter(new TabCompleterClass());
 		this.getCommand("special").setTabCompleter(new TabCompleterClass());
@@ -154,7 +171,7 @@ public class Main extends JavaPlugin implements Listener {
 		Bukkit.getScheduler().runTaskLater(this, new Runnable() {
 			@Override
 			public void run() {
-				Bukkit.getPluginManager().callEvent(gametickevent);
+//				Bukkit.getPluginManager().callEvent(gametickevent);
 			}
 		}, 20L);
 		specials = this.addSpecial(specials,
@@ -175,8 +192,9 @@ public class Main extends JavaPlugin implements Listener {
 				ChatColor.YELLOW + "Coordinate Sign", 323, ChatColor.GRAY + "Prints location when you place it"));
 		specials = this.addSpecial(specials, new Special("primedtnt", "ptnt",
 				ChatColor.RESET + "" + ChatColor.BOLD + "Primed TNT", 46, ChatColor.GRAY + "Is ignited upon placing"));
-		specials = this.addSpecial(specials, new Special("rainbowwool", "rbwool",
-				ChatColor.RESET + cc("&cR&6a&ei&an&bb&1o&dw &fWool"), 35, cc("&c&oR&6&oa&e&oi&a&on&b&ob&1&oo&5&ow&d&os!"), ChatColor.DARK_GRAY + "0"));
+		specials = this.addSpecial(specials,
+				new Special("rainbowwool", "rbwool", ChatColor.RESET + cc("&cR&6a&ei&an&bb&1o&dw &fWool"), 35,
+						cc("&c&oR&6&oa&e&oi&a&on&b&ob&1&oo&5&ow&d&os!"), ChatColor.DARK_GRAY + "0"));
 		log("--E-N-A-B-L-E-D--");
 	}
 
@@ -225,11 +243,11 @@ public class Main extends JavaPlugin implements Listener {
 			}
 			return true;
 		} else if (cmd.equals("hat")) {
-			if(args.length == 0) {
-				p.sendMessage(tag+cc("&c/hat <Player Name>"));
+			if (args.length == 0) {
+				p.sendMessage(tag + cc("&c/hat <Player Name>"));
 				return true;
 			} else {
-				String c = "give " + p.getName() +  " minecraft:skull 1 3 {SkullOwner:\""+args[0]+"\"}";
+				String c = "give " + p.getName() + " minecraft:skull 1 3 {SkullOwner:\"" + args[0] + "\"}";
 				p.sendMessage(c);
 				getServer().dispatchCommand(sender, c);
 				return true;
@@ -303,8 +321,6 @@ public class Main extends JavaPlugin implements Listener {
 					return true;
 
 				} else if (args[0].equals("delay")) {
-					System.out.println("WARIDO: Delay");
-					System.out.println(args);
 					if (args.length == 1) {
 						p.playSound(p.getLocation(), Sound.NOTE_PLING, 1.0f, 1.125f);
 						Long delay = rbDefaultDelay;
@@ -524,7 +540,6 @@ public class Main extends JavaPlugin implements Listener {
 					for (int i = 1; i < args.length; i++) {
 						name += args[i];
 					}
-					System.out.println("\"" + name + "\"");
 					name = name.replaceAll("\\s", "\\_");
 					List<World> worlds = getServer().getWorlds();
 					for (World w : worlds) {
@@ -575,18 +590,41 @@ public class Main extends JavaPlugin implements Listener {
 				return true;
 			}
 		} else if (cmd.equals("names")) {
-			if(args.length == 0) {
-				line(sender);
-				TableGenerator tg = new TableGenerator(Alignment.LEFT, Alignment.LEFT);
-		        tg.addRow("&2Username", p.getName());
-		        tg.addRow("&2Display Name", p.getDisplayName());
-		        tg.addRow("&2Custom Name", p.getCustomName());
-		        tg.addRow("&2Player List Name", p.getPlayerListName());
-		        for (String line : tg.generate(Receiver.CLIENT, true, true)) {
-		        	p.sendMessage(cc(line));
-		        }
-				line(sender);
+			Player target = p;
+			if (args.length != 0) {
+				Player check = getServer().getPlayer(args[0]);
+				if(check != null) {
+					target = check;
+				}
 			}
+			line(sender);
+			TableGenerator tg = new TableGenerator(Alignment.LEFT, Alignment.LEFT);
+			tg.addRow("&2Username", target.getName());
+			tg.addRow("&2Display Name", target.getDisplayName());
+			tg.addRow("&2Custom Name", target.getCustomName());
+			tg.addRow("&2Player List Name", target.getPlayerListName());
+			for (String line : tg.generate(Receiver.CLIENT, true, true)) {
+				p.sendMessage(cc(line));
+			}
+			line(sender);
+		}else if (cmd.equals("name")) {
+			Player target = p;
+			if (args.length != 0) {
+				Player check = getServer().getPlayer(args[0]);
+				if(check != null) {
+					target = check;
+				}
+			}
+			line(sender);
+			TableGenerator tg = new TableGenerator(Alignment.LEFT, Alignment.LEFT);
+			tg.addRow("&2Username", target.getName());
+			tg.addRow("&2Display Name", target.getDisplayName());
+			tg.addRow("&2Custom Name", target.getCustomName());
+			tg.addRow("&2Player List Name", target.getPlayerListName());
+			for (String line : tg.generate(Receiver.CLIENT, true, true)) {
+				p.sendMessage(cc(line));
+			}
+			line(sender);
 		} else if (cmd.equals("fly")) {
 			if (args.length == 0) {
 				if (p.getAllowFlight()) {
@@ -599,11 +637,39 @@ public class Main extends JavaPlugin implements Listener {
 				}
 			}
 			return true;
+		} else if (cmd.equals("speed")) {
+			if (args.length == 0) {
+				line(p);
+				sender.sendMessage(cc("Your walk speed: &a" + map(p.getWalkSpeed(), 0, 0.2f, 0, 100) + "%"));
+				sender.sendMessage(cc("Your fly speed:  &a" + map(p.getFlySpeed(), 0, 0.1f, 0, 100) + "%"));
+				line(p);
+			} else {
+				String newSpeed = args[0];
+				float speed = Float.parseFloat(args[0]) / 500;
+				if (speed > 1) {
+					newSpeed = "500";
+					speed = 1;
+				}
+				if (speed < 0) {
+					newSpeed = "0";
+					speed = 0;
+				}
+				p.setWalkSpeed(speed);
+				sender.sendMessage(cc("Set your walk speed to &a" + args[0] + "%"));
+			}
+			return true;
 		} else if (cmd.equals("practice") | cmd.equals("pr")) {
 			if (args.length == 0) {
 				line(sender);
 				sender.sendMessage(tag + "Practice Commands");
-				sender.sendMessage(cc("&2/pr &ainventory&e: Starts an inventory aim trainer"));
+				JSONMessage msg = new JSONMessage();
+				msg.addText("/pr ", ChatColor.DARK_GREEN);
+				msg.addText("inventory", ChatColor.GREEN);
+				msg.addHoverEvent(HoverAction.TEXT, "list, id");
+				msg.addText(": Starts an inventory aim trainer",ChatColor.YELLOW);
+				msg.addText("");
+				sendJSONMessage(p, msg);
+//				sender.sendMessage(cc("&2/pr &ainventory&e: Starts an inventory aim trainer"));
 				line(sender);
 				return true;
 			} else {
@@ -611,31 +677,32 @@ public class Main extends JavaPlugin implements Listener {
 					String uuid = p.getUniqueId().toString();
 					int songID = 0;
 					songProgress.put(uuid, 0);
-					if(args.length == 1) {
-						if(songSelected.get(uuid) == null) {
+					if (args.length == 1) {
+						if (songSelected.get(uuid) == null) {
 							songSelected.put(uuid, 0);
-						}else {
+						} else {
 							songID = songsList.rotate(songSelected.get(uuid));
 							songSelected.put(uuid, songID);
 						}
 					} else {
-						if(args[1].equalsIgnoreCase("list")) {
+						if (args[1].equalsIgnoreCase("list")) {
 							line(sender);
 							sender.sendMessage(tag + "Inventory Practice Songs");
-							for(int i = 0;i < songsList.length();i++) {
-								sender.sendMessage(cc("&2["+i+"] &a" + songsList.getSongName(i)));
+							for (int i = 0; i < songsList.length(); i++) {
+								Song s = songsList.getSong(i);
+								sender.sendMessage(cc("&2[" + i + "] &a" + s.toString() + " &7("
+										+ ticksToTimeString(s.getSongLength()) + ")"));
 							}
 							line(sender);
-							return true;
 						} else {
 							int actualSongID = Integer.parseInt(args[1]);
-							if(songsList.getSong() != "") {
+							if (songsList.getSong() != null) {
 								songID = actualSongID;
 								songSelected.put(uuid, songID);
 							} else {
-								if(songSelected.get(uuid) == null) {
+								if (songSelected.get(uuid) == null) {
 									songSelected.put(uuid, 0);
-								}else {
+								} else {
 									songID = songsList.rotate(songSelected.get(uuid));
 									songSelected.put(uuid, songID);
 								}
@@ -643,10 +710,10 @@ public class Main extends JavaPlugin implements Listener {
 						}
 					}
 					String title = ChatColor.GOLD + "[PR] InvAim: " + ChatColor.GRAY + songsList.getSongName(songID);
-					if(title.length() > 32) {
+					if (title.length() > 32) {
 						title = title.substring(0, 29) + "...";
 					}
-					Inventory inv = Bukkit.createInventory(p, 9*6, title);
+					Inventory inv = Bukkit.createInventory(p, 9 * 6, title);
 					int notePlace = (int) Math.floor((Math.random() * inv.getSize()));
 					int next = (int) Math.floor((Math.random() * inv.getSize()));
 					if (notePlace == next) {
@@ -683,37 +750,197 @@ public class Main extends JavaPlugin implements Listener {
 				}
 			}
 			return true;
-		} else if (cmd.equals("config") | cmd.equals("cnf")) {
+		}else if(cmd.equals("note")) {
 			if(args.length == 0) {
-				sender.sendMessage(tag + ChatColor.RED + "/config <path to value>");
-			} else if (args.length == 1) {
-				if(args[0].equalsIgnoreCase("save")) {
-					try {
-						getConfig().save("config.yml");
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+				
+			}else {
+				Location loc = p.getLocation().add(new Vector(0, 1, 0));
+				float size = 70f;
+		        float dist = 2;
+		        float dir = (float) Math.toRadians(p.getLocation().getYaw() + 90);
+				float x = (float) (loc.getX() + (Math.cos(dir) * dist));
+		        float y = (float) loc.getY();
+		        float z = (float) (loc.getZ() + (Math.sin(dir) * dist));
+		        int col = Integer.parseInt(args[0]);
+		        NoteColor color = new NoteColor(col);
+		        Location locFinal = new Location(p.getWorld(), x, y, z);
+		        ParticleEffect.NOTE.display(color, locFinal, 32);
+			}
+		} else if (cmd.equals("song") | cmd.equals("jingle")) {
+			String keyword = "Song";
+			Songs list = songsList;
+			if(cmd.equals("jingle")) {
+				keyword = "Jingle";
+				list = jinglesList;
+			}
+			if (args.length == 0) {
+				line(sender);
+				sender.sendMessage(tag + keyword + " Commands");
+				sender.sendMessage(cc("&2/"+keyword.toLowerCase()+" &alist&e: List all "+keyword.toLowerCase()+"s"));
+				sender.sendMessage(cc("&2/"+keyword.toLowerCase()+" &aplay <id>&e: Play a " + keyword.toLowerCase()));
+				line(sender);
+			} else {
+				if (args[0].equalsIgnoreCase("list")) {
+					line(sender);
+					sender.sendMessage(tag + keyword + " list");
+					for (int i = 0; i < list.length(); i++) {
+						Song s = list.getSong(i);
+						sender.sendMessage(cc("&2[" + i + "] &a" + s.toString() + " &7("
+								+ ticksToTimeString(s.getSongLength()) + ")"));
 					}
-					sender.sendMessage(tag +"Saved");
-					return true;
-				}else {
-					Object any = getConfig().get(args[0]);
-					if(any != null) {
-						sender.sendMessage(any.toString());
-						return true;
-					}else {
-						sender.sendMessage(tag + ChatColor.RED + "NULL");
-						return true;
+					line(sender);
+				} else if (args[0].equalsIgnoreCase("play")) {
+					if (args.length == 1) {
+						p.sendMessage(tag + ChatColor.RED + "/"+keyword.toLowerCase()+" play <id>");
+					} else {
+						int i = 0;
+						if (args[1].equalsIgnoreCase("random")) {
+							i = (int) Math.floor(Math.random() * list.length());
+						} else {
+							i = Integer.parseInt(args[1]);
+							if (i >= list.length() | i < 0) {
+								p.sendMessage(tag + ChatColor.RED + "Invalid ID");
+								return true;
+							}
+							
+							String uuid = p.getUniqueId().toString();
+							Song s = list.getSong(i);
+							
+							if(s.isLayered()) {
+								for(Layer l : s.getLayers()) {
+									announce(l.getName() + ": " + l.getStart());
+								}
+							}
+							
+							songSelected.put(uuid, i);
+							songProgress.put(uuid, 0);
+							Songs liste = list;
+							p.sendMessage(tag + "Playing " + ChatColor.ITALIC + s.toString());
+							
+							BukkitScheduler scheduler = this.getServer().getScheduler();
+							for(int i1 = 0; i1 < s.getLength(); i1++) {
+								scheduler.scheduleSyncDelayedTask(this, new Runnable() {
+	
+									@Override
+									public void run() {
+										int progress = songProgress.get(uuid);
+										String[] notes = liste.getSong(songSelected.get(uuid)).getSongString().split("\s");
+										String n = notes[progress % notes.length];
+										songProgress.put(uuid, progress + 1);
+										String extra = "";
+										if(!n.equalsIgnoreCase("x")) {
+											String[] blocks = n.split(",");
+											int d = blocks.length;
+											for(String b : blocks) {
+												float pitch = liste.noteToPitch(b);
+												Sound sound = liste.noteToSound(b);
+												String prefix = liste.noteToSoundString(b);
+												com.warido.plugin.Instrument instrument = liste.noteToInstrument(b);
+												p.playSound(p.getLocation(), sound, 1.0f, pitch);
+												Location loc = p.getLocation().add(new Vector(0, 1, 0));
+												float size = 70f;
+										        float offset = map(pitch,0.5f,2f,-size,size);
+										        float dist = 2;
+										        float dir = (float) Math.toRadians(p.getLocation().getYaw() + offset + 90);
+										        float yoff = 0;
+										        int col = 10;
+										        float yfac = 2;
+										        if(instrument.toString().equalsIgnoreCase(com.warido.plugin.Instrument.PIANO.toString())) {
+										        	col = 22;
+										        	yoff = 0.5f;
+										        }else if(instrument.toString().equalsIgnoreCase(com.warido.plugin.Instrument.BASS.toString())) {
+										        	col = 11;
+										        	yoff = 0f;
+										        }else if(instrument.toString().equalsIgnoreCase(com.warido.plugin.Instrument.BASS_DRUM.toString())) {
+										        	col = 14;
+										        	yoff = -1f;
+										        }else if(instrument.toString().equalsIgnoreCase(com.warido.plugin.Instrument.SNARE.toString())) {
+										        	col = 7;
+										        	yoff = -0.5f;
+										        }
+												float x = (float) (loc.getX() + (Math.cos(dir) * dist));
+										        float y = (float) loc.getY() + yoff * yfac;
+										        float z = (float) (loc.getZ() + (Math.sin(dir) * dist));
+										        NoteColor color = new NoteColor(col);
+										        Location locFinal = new Location(p.getWorld(), x, y, z);
+										        ParticleEffect.NOTE.display(color, locFinal, 32);
+//										        PacketPlayOutWorldParticles packet = new PacketPlayOutWorldParticles(
+//										        		net.minecraft.server.v1_8_R3.EnumParticle.NOTE, true, x, y, z, rd, gr, bl, 0.05f, 0);
+//										        ((CraftPlayer) p).getHandle().playerConnection.sendPacket(packet);
+												extra = pitch + " - " + sound.name(); 
+											}
+										}
+										sendActionBar(p, cc("&3" + ticksToTimeString((s.getLength() - progress) * s.getSpeed(), false)));
+//										sendActionBar(p, cc("&2" + progress + ": &a" + n + " &7(" + extra + ")"));
+									}
+								}, s.getSpeed() * i1);
+							}
+						}
 					}
-				}
-			} else if (args.length == 3) {
-				if(args[0].equalsIgnoreCase("set")) {
-					sender.sendMessage(tag + cc("Set &7" + args[1] + "&f to &7" + args[2]));
-					getConfig().set(args[1], args[2]);
-					return true;
+				}else if (args[0].equalsIgnoreCase("read")) {
+					if (args.length == 1) {
+						p.sendMessage(tag + ChatColor.RED + "/song read <id>");
+					} else {
+						int i = 0;
+						i = Integer.parseInt(args[1]);
+						if (i >= list.length() | i < 0) {
+							p.sendMessage(tag + ChatColor.RED + "Invalid ID");
+							return true;
+						}
+						Song s = list.getSong(i);
+						line(p);
+						int linesize = 16;
+						ArrayList<Alignment> a = new ArrayList<Alignment>();
+						for(int i1 = 0;i1 < linesize;i1++) {
+							a.add(Alignment.LEFT);
+						}
+						TableGenerator tg = new TableGenerator(a.toArray(new Alignment[0]));
+						int left = 0;
+						while(left != s.getSongLength()) {
+							ArrayList<String> tableItems = new ArrayList<String>();
+							for(int i1 = 0;i1 < linesize;i1++) {
+								String n = s.getNote(left);
+								if(n.equalsIgnoreCase("x")) {
+									tableItems.add("&8x");	
+								}else {
+									String[] notes = n.split(",");
+									String str = "";
+									for(String note : notes) {
+										com.warido.plugin.Instrument instrument = com.warido.plugin.Instrument.getInstrument(note.replaceAll("([A-G](|#)\\d)", "").trim());
+										String prefix = instrument.toString();
+										note = note.replaceAll("\\d", "").replace('#', '\'');
+										if(prefix == "") {
+											str += " " + instrument.getColor() + note;
+										}else {
+											str += " " + note.replace(prefix, instrument.getColor() + "");
+										}
+									}
+									tableItems.add(str.trim());	
+								}
+								left++;
+								if(left == s.getSongLength()) {
+									break;
+								}
+							}
+							tg.addRow(tableItems.toArray(new String[0]));
+						}
+						p.sendMessage(tag + "Reading " + ChatColor.ITALIC + s.toString());
+						JSONMessage msg = new JSONMessage();
+						msg.addText("[Play]");
+						msg.addClickEvent(JSONMessage.ClickAction.COMMAND, "/"+keyword.toLowerCase()+" play " + args[1]);
+						Main.sendJSONMessage(p, msg);
+						for (String line : tg.generate(Receiver.CLIENT, true, true)) {
+							if(line.trim() != "") {
+								p.sendMessage(cc(line));
+							}
+						}
+						line(p);
+					}
 				}
 			}
-			sender.sendMessage(tag + "i'm too lazy to code this shit in, it's a debug command anyways");
+			return true;
+		}else if (cmd.equals("clearsb") | cmd.equals("clearscoreboard")) {
+			p.getScoreboard().clearSlot(DisplaySlot.SIDEBAR);
 			return true;
 		}
 		p.sendMessage(tag + ChatColor.RED + "Command not handled: " + ChatColor.DARK_RED + "tell warido he sucks");
@@ -745,27 +972,38 @@ public class Main extends JavaPlugin implements Listener {
 		PacketPlayOutChat ppoc = new PacketPlayOutChat(cbc, (byte) 2);
 		p.getHandle().playerConnection.sendPacket(ppoc);
 	}
-
-	public static void newScoreboard(Player p) {
-		ScoreboardManager manager = Bukkit.getScoreboardManager();
-		Scoreboard scoreboard = manager.getNewScoreboard();
-		Objective board = scoreboard.registerNewObjective("Ping", "dummy");
-//		Objective tablist = scoreboard.registerNewObjective("tablist", "dummy");
-		
-		board.setDisplayName(tag);
+	
+	public static void updateScoreboard(Player p, String name, String[] lines) {
+		Scoreboard sb = p.getScoreboard();
+		for(Team t : sb.getTeams()) {
+			t.unregister();
+		}
+		Objective board = sb.getObjective("scoreboard");
+		if(board == null) {
+//			old.unregister();
+			board = sb.registerNewObjective("scoreboard", "dummy");
+		}
+		board.setDisplayName(name);
 		board.setDisplaySlot(DisplaySlot.SIDEBAR);
-//		tablist.setDisplaySlot(DisplaySlot.PLAYER_LIST);
-		
-//		Score ping = tablist.getScore("Ping");
-		Score bps = board.getScore("BPS");
-		Score entities = board.getScore("Entities");
-
-//		ping.setScore(0);
-		bps.setScore(0);
-		entities.setScore(0);
-		
-		p.setScoreboard(scoreboard);
+		int i = lines.length;
+		for(String line : lines) {
+			Team s = sb.getTeam(i+"");
+			if(s == null) {
+				s = sb.registerNewTeam(i+"");
+			}
+			for(String e : s.getEntries()) {				
+				s.removeEntry(e);
+			}
+			String l = cc(line);
+//			s.addEntry(l);
+			s.setPrefix("");
+			s.setSuffix("");
+//			board.getScore(l).setScore(i);
+			i--;
+		}
+		p.setScoreboard(sb);
 	}
+
 
 	public static void log(String... msgs) {
 		for (String msg : msgs) {
@@ -773,12 +1011,52 @@ public class Main extends JavaPlugin implements Listener {
 		}
 	}
 
-
 	public static String cc(String msg) {
 		return ChatColor.translateAlternateColorCodes('&', msg);
 	}
 
 	public static void line(CommandSender sender) {
-		sender.sendMessage(ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "------------------------------");
+		sender.sendMessage(ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "------------------------------------");
+	}
+
+	public static String ticksToTimeString(int ticks, Boolean round) {
+		String output = "";
+		int hours = 0;
+		int minutes = 0;
+		float seconds = ticks * 0.05f;
+		if (seconds >= 60) {
+			minutes = (int) (seconds / 60);
+			seconds = seconds % 60;
+		}
+		String zeroSec = "";
+		if (seconds < 10) {
+			zeroSec = "0";
+		}
+		if(round) {
+			output = minutes + ":" + zeroSec + ((int) seconds);
+		}else {
+			output = minutes + ":" + zeroSec + (((double) Math.round(seconds * 10)) / 10);
+		}
+		return output;
+	}
+	
+	public static String ticksToTimeString(int ticks) {
+		return ticksToTimeString(ticks, true);
+	}
+
+	public static void announce(String msg) {
+		Bukkit.getServer().broadcastMessage(msg);
+	}
+
+	public static void setScoreboardValue(Objective o, String key, int value) {
+		o.setDisplayName(cc("&2" + key + ": &a" + value));
+	}
+	
+	public static void sendJSONMessage(Player p, JSONMessage msg) {
+		String msgString = msg.toString();
+		log(msgString);
+		IChatBaseComponent comp = ChatSerializer.a(msgString);
+		PacketPlayOutChat chat = new PacketPlayOutChat(comp);
+		((CraftPlayer)p).getHandle().playerConnection.sendPacket(chat);
 	}
 }

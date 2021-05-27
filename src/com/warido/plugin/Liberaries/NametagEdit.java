@@ -1,4 +1,4 @@
-package com.warido.plugin;
+package com.warido.plugin.Liberaries;
 
 import net.minecraft.server.v1_8_R3.PacketPlayOutScoreboardTeam;
 

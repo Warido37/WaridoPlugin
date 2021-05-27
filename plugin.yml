@@ -59,4 +59,14 @@ commands:
         description: View your names
     hat:
         description: Gives hat.
-    
+    speed:
+        description: Changes walk/fly speed
+    song:
+        description: Plays a song
+    jingle:
+        description: Plays a jingle
+    clearscoreboard:
+        description: Clears scoreboard
+        aliases: [clearsb]
+    note:
+        description: Show a note particle, test out it's color values
